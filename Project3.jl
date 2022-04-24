@@ -594,15 +594,16 @@ function gauss_newton(f, j, x; monitor=(x,rnorm)->nothing)
 	a = 1
 	for i = 1:10
 		J = j(xnew)
+		fnew= f(xnew)
 		#=
 		term = J' * f(xnew)
 		inv = (J'*J) \ term
 		=#
-		inv = J \ f(xnew)
+		inv = J \ fnew
 		
 		xnew = xnew - a * inv
 		
-		monitor(xnew,norm(inv))
+		monitor(xnew,norm(fnew))
 	end
 	xnew
 end
@@ -610,7 +611,6 @@ end
 # ╔═╡ 2a558341-06f6-4720-b525-0d5850b0a1e7
 begin
 	gn= []
-	monitor(x) = push!(gn,x)
 	gauss_newton(f, j, [2.0, 2.0], monitor=(x, rnorm,)->push!(gn, rnorm))
 end
 
@@ -702,22 +702,39 @@ begin
 	rho = 2 * sqrt(error / smallest_eigen_val)
 end
 
-# ╔═╡ b8f58aed-5582-49be-adb5-3924fcae7d0b
-begin
-	x = [3 2;3 2]
-	Dspline_K(x,uqrand)
+# ╔═╡ d2fc5606-5b15-4b62-8fde-ef3a119b634d
+function spline_deriv(x,u,c)
+	d,m = size(u)
+	result =  sum(c[j]*∇ϕ(x-u[:,j]) for j=1:m) + c[m+1:m+d] 
+
 end
 
+# ╔═╡ 3956be53-f8fb-4748-827a-bac27cab2f6f
+function spline_hess(x,u,c)
+	d,m = size(u)
+	result = sum(c[j]*Hϕ(x-u[:,j]) for j=1:m)
+	
+end
 
 # ╔═╡ 8a52a7e8-257a-4710-8a73-7ff936211358
 begin
-	gn2= []
-	x0 = [3,2]
-	gauss_newton(∇ϕ, Hϕ, x0, monitor=(x, rnorm)->push!(gn2, rnorm))
+	tr2= []
+	tr3 = []
+	x0 = [3.473684210526316, -0.9473684210526315]
+	x1 = [3.0,2.0]
+	
+	spline_f(x) = spline_deriv(x,uqrand,c_qr1)
+	spline_j(x) = spline_hess(x,uqrand,c_qr1)
+	spline_eval2(x) = spline_eval(x,uqrand,c_qr1)
+	tr_newton(x0,spline_eval2,spline_f,spline_j,monitor=(x, rnorm, μ)->push!(tr2, rnorm))
+	tr_newton(x1,spline_eval2,spline_f,spline_j,monitor=(x, rnorm, μ)->push!(tr3, rnorm))
 end
 
 # ╔═╡ 077864c8-8d66-4892-8f14-b936fd5196d3
-plot(gn2, yscale=:log10)
+plot(tr2, yscale=:log10)
+
+# ╔═╡ fb6f7d10-8351-4566-ac3b-369076dbe294
+plot(tr3, yscale=:log10)
 
 # ╔═╡ 14bc2bcb-5195-4820-9212-9fa0956c4b2b
 md"""
@@ -842,29 +859,16 @@ Complete the `spline_forward_regression` function below, then run the code with 
 
 # ╔═╡ 0513363b-bf3c-4b90-afac-02286cabd175
 function spline_forward_regression(ucrand, xx, y, npoints)
-	#Use a boolean mask to track the active/inactive nodes
-	current = ucrand[:,1]
-	ucrand = ucrand[:,2:end]
+	A = [spline_Π(xx) spline_K(xx,ucrand)]
+	idx,_,x,r = forward_selection(A,y,3,npoints)
+	norm(r) / npoints
 	
-	for i = 2:npoints
-		N = length(ucrand)
-		values = zeros(N)
-		for j = 1:N
-			u = ucrand[:,j]
-			appended = [current,u]
-			values[j] =  rms_vs_truth(current,spline_fit(appended, xx, y))
-		end
-		best = argmin(values)
-		current = [current,qcrand[:,best]]
-		ucrand = ucrand[:,[1:best,(best + 1):end]]
-	end
-	current
 end
 
 # ╔═╡ 875c4a94-4252-4ef1-ad7a-5b8c6e48f752
 begin
 	ucrand = 12 * kronecker_quasirand(2, 500) .- 6
-	centers = spline_forward_regression(ucrand, xx_data, y_data, 500)
+	spline_forward_regression(ucrand, xx_data, y_data, 50)
 end
 
 # ╔═╡ 2662eba2-7cb3-4085-87bc-812ed2625046
@@ -1969,9 +1973,11 @@ version = "0.9.1+5"
 # ╟─3976c748-b2f1-46ed-b757-ba479c5f8481
 # ╟─7cb92eb0-443b-406b-8c91-e76669f0251e
 # ╠═8a6cb03c-fb1a-4307-9280-255e8fe3e053
-# ╠═b8f58aed-5582-49be-adb5-3924fcae7d0b
+# ╠═d2fc5606-5b15-4b62-8fde-ef3a119b634d
+# ╠═3956be53-f8fb-4748-827a-bac27cab2f6f
 # ╠═8a52a7e8-257a-4710-8a73-7ff936211358
 # ╠═077864c8-8d66-4892-8f14-b936fd5196d3
+# ╠═fb6f7d10-8351-4566-ac3b-369076dbe294
 # ╟─14bc2bcb-5195-4820-9212-9fa0956c4b2b
 # ╠═465b74a5-6539-4c62-aed8-24ec7cc9b7e4
 # ╟─4ab01573-7a8c-4dd3-a138-8c43f867e562
@@ -1998,7 +2004,7 @@ version = "0.9.1+5"
 # ╟─8cb07531-4d95-4c80-8b58-171487df1951
 # ╟─7037f111-bd5c-40a6-bc65-6637cc67c0f8
 # ╠═4c9373f8-f8eb-4ae4-a1af-826839db8389
-# ╟─68a077f0-1280-4f52-87ec-9514df53fb5d
+# ╠═68a077f0-1280-4f52-87ec-9514df53fb5d
 # ╟─37009b68-6b70-4204-ac33-19818d8fc348
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
