@@ -570,28 +570,65 @@ md"""
 3. Run the same experiment with the Newton solver, but this time using the trust region version that is provided.
 """
 
+# ╔═╡ 64eae180-b218-4e58-b8c7-d4214e019a3d
+md"""
+
+#### Part 1 - Levenberg Marquardt
+
+We can first take the gradient and Jacobians of the Himmelblau function:
+
+$$\begin{align*}
+\frac{\partial f}{\partial x} = 4x(x^2 + y - 11) + 2(x + y^2 - 7)\\
+\frac{\partial f}{\partial y} = 2(x^2 + y - 11) + 4y(x + y^2 - 7)
+\end{align*}$$
+
+Next we can compute the Jacobian:
+
+$$\begin{align*}
+\frac{\partial^2 f}{\partial x^2} &= 12x^2 + 4y - 42 \\
+\frac{\partial^2 f}{\partial x\partial y} &= 4x + 4y\\
+\frac{\partial^2 f}{\partial y^2} &= 12y^2 + 4x - 26 \\
+\end{align*}$$
+
+
+Next we can store these functions and use the levenberg-marquardt solver:
+"""
+
 # ╔═╡ 45dc649b-eb08-4191-bba2-d49434832a6e
+#Stores function evaluation of himmelblau derivative
 f(x) = [4*x[1]*(x[1]^2+x[2]-11)+2*(x[1]+x[2]^2-7); 2*(x[1]^2+x[2]-11)+4*x[2]*(x[1]+x[2]^2-7)]
 
 # ╔═╡ 1364894e-4b6d-411d-b8f5-c4187d502187
+#Stores function evaluation of himmelblau Jacobian
 j(x) = [12*x[1]^2+4*x[2]-42 4*x[1]+4*x[2]; 4*x[1]+4*x[2] 12*x[2]^2+4*x[1]-26]
-
-# ╔═╡ 47dbfcbb-8569-48a1-8305-db3762bbca29
-levenberg_marquardt(f, j, [2.0, 2.0])
 
 # ╔═╡ e705911f-6f03-410d-af19-66027d5f14c2
 begin
 	lm = []
-	levenberg_marquardt(f, j, [2.0, 2.0], monitor=(x, rnorm, μ)->push!(lm, rnorm))
+	result = levenberg_marquardt(f, j, [2.0, 2.0], monitor=(x, rnorm, μ)->push!(lm, rnorm))
 end
 
 # ╔═╡ 59ba6ec2-905b-4dcb-9576-c2a311cddba6
 plot(lm, yscale=:log10)
 
+# ╔═╡ d827c0ad-c722-46cc-9652-aeaee8f9f672
+md"""
+
+From the plot and value above we can see that this method converges linearly to the zero at point (3,2).
+"""
+
+# ╔═╡ c7cf0788-0d3f-4a90-8d86-0474b4d013eb
+md"""
+
+#### Part 2 - Gauss Newton
+
+We can again use the gradient and jacobian functions from the previous part to find a gauss netwon solution. We can see from the results below that this method converges quadratically to the zero at the point (3.58443, -1.84813).
+"""
+
 # ╔═╡ e0559a2a-a4a5-4a52-96e1-da7c15638680
 function gauss_newton(f, j, x; monitor=(x,rnorm)->nothing)
 	xnew = copy(x)
-	a = 1
+	step = 1
 	for i = 1:10
 		J = j(xnew)
 		fnew= f(xnew)
@@ -601,7 +638,7 @@ function gauss_newton(f, j, x; monitor=(x,rnorm)->nothing)
 		=#
 		inv = J \ fnew
 		
-		xnew = xnew - a * inv
+		xnew = xnew - step * inv
 		
 		monitor(xnew,norm(fnew))
 	end
@@ -611,11 +648,19 @@ end
 # ╔═╡ 2a558341-06f6-4720-b525-0d5850b0a1e7
 begin
 	gn= []
-	gauss_newton(f, j, [2.0, 2.0], monitor=(x, rnorm,)->push!(gn, rnorm))
+	gauss_newton(f, j, [2.0, 2.0], monitor=(x, rnorm)->push!(gn, rnorm))
 end
 
 # ╔═╡ 077085a9-6397-4b75-9e31-191376c1712d
 plot(gn, yscale=:log10)
+
+# ╔═╡ fab88160-b284-4f29-8702-76297932b604
+md"""
+
+#### Part 3 - Trust Region Newton
+
+We can repeat the previous test but this time using the provided trust region newton solver code provided. This method gives a different result in which the algorithm converges quadratically to a different zero. This experiment converges to the zero at (3,2) where the levenberg-marquardt method also converged.
+"""
 
 # ╔═╡ 9e268afe-6a03-448c-90d5-c0e43e7eb78d
 begin
@@ -682,28 +727,53 @@ $$\tilde{\rho} = 2\sqrt{\frac{\delta}{\lambda_{\min}(H_g(x_*))}}$$
 For the first task, you may use without proof that $\lambda_{\min}(A+E) \geq \lambda_{\min}(A)-\|E\|_2$ when $A$ and $E$ are symmetric.  For the second question, remember that the log transform we used is $g \mapsto \log(g + 10)$.  You should also not expect to get a tiny value for $\tilde{\rho}$!
 """
 
+# ╔═╡ 11cd15f7-90d8-4436-81c2-510de6ad1bbc
+md"""
+#### Part 1
+
+"""
+
 # ╔═╡ 7cb92eb0-443b-406b-8c91-e76669f0251e
 md"""
-#### Question 2
+#### Part 2
+
+
+The following code implements this and computes the smallest singular value and the value of $\rho$. We found that the smallest singular value is $2.57157$ and $\rho = 1.38574$.
 """
 
 # ╔═╡ 8a6cb03c-fb1a-4307-9280-255e8fe3e053
 begin
+
+	#Computes smallest singular value
 	xy = [3.0,2.0]
 	g = 10 + himmelblau(xy)
 	hg = j(xy)
-	hesh = (1/g) * hg  # this second part is 0 as given in task 1 
+	hesh = (1/g) * hg  
 	smallest_eigen_val = minimum(eigvals(hesh))
 
-	
+
+	#Computes rho
 	spline_approx = spline_eval(xy, uqrand, c_qr1)
 	error = abs(log_himmelblau(xy) - spline_approx)
 
 	rho = 2 * sqrt(error / smallest_eigen_val)
+
+	smallest_eigen_val,rho
 end
+
+# ╔═╡ ad0fdf80-6061-44c0-ae88-a9b781013468
+md"""
+
+#### Part 3
+
+We can first compute the derivative and Hessian of the spline function. This is implemented in the following two functions.
+
+
+"""
 
 # ╔═╡ d2fc5606-5b15-4b62-8fde-ef3a119b634d
 function spline_deriv(x,u,c)
+	#Computes spline derivative with respect to x
 	d,m = size(u)
 	result =  sum(c[j]*∇ϕ(x-u[:,j]) for j=1:m) + c[m+1:m+d] 
 
@@ -711,6 +781,7 @@ end
 
 # ╔═╡ 3956be53-f8fb-4748-827a-bac27cab2f6f
 function spline_hess(x,u,c)
+	#Computes spline hessian with respect to x
 	d,m = size(u)
 	result = sum(c[j]*Hϕ(x-u[:,j]) for j=1:m)
 	
@@ -718,20 +789,41 @@ end
 
 # ╔═╡ 8a52a7e8-257a-4710-8a73-7ff936211358
 begin
+	#Initial parameters
 	tr2= []
 	tr3 = []
 	x0 = [3.473684210526316, -0.9473684210526315]
 	x1 = [3.0,2.0]
 	
+	#Stores spline derivative and Hessian functions
 	spline_f(x) = spline_deriv(x,uqrand,c_qr1)
 	spline_j(x) = spline_hess(x,uqrand,c_qr1)
+	
+	#Overloaded spline evaluation
 	spline_eval2(x) = spline_eval(x,uqrand,c_qr1)
-	tr_newton(x0,spline_eval2,spline_f,spline_j,monitor=(x, rnorm, μ)->push!(tr2, rnorm))
-	tr_newton(x1,spline_eval2,spline_f,spline_j,monitor=(x, rnorm, μ)->push!(tr3, rnorm))
+
+	#Runs trust region newton solver on both initial points
+	x0 = tr_newton(x0,spline_eval2,spline_f,spline_j,monitor=(x, rnorm, μ)->push!(tr2, rnorm))
+	x1 = tr_newton(x1,spline_eval2,spline_f,spline_j,monitor=(x, rnorm, μ)->push!(tr3, rnorm))
+
+	x0,x1
 end
+
+# ╔═╡ 5bfad42d-7871-4c71-8a2d-321033538a4d
+md"""
+ The following is the convergence plot of this method when run on the starting point
+(3.473684210526316, -0.9473684210526315) found above. This experiment resulted in convergence to the point (3.5537, -1.38958).
+"""
 
 # ╔═╡ 077864c8-8d66-4892-8f14-b936fd5196d3
 plot(tr2, yscale=:log10)
+
+# ╔═╡ c7e0c52f-1419-41cf-91d5-d9889fa2a773
+md"""
+ The following is the convergence plot of this method when run on the starting point
+(2,2). This starting point resulted in quadratic convergence to the point (3.5537
+-1.38958).
+"""
 
 # ╔═╡ fb6f7d10-8351-4566-ac3b-369076dbe294
 plot(tr3, yscale=:log10)
@@ -808,13 +900,15 @@ Run experiments with the `test_sample` functions for both the standard spline fi
 md"""
 
 #### Solution
+
+The following code segment generates 3 different sets of centers using the different sampling methods mentioned. $q1$ forms a deterministic $7 \times 7$ grid of points over the search region. $q2$ Samples from a random distribution over the search region. $q3$ samples from a quasi-random method to get 50 points ranging over the search space.
 """
 
 # ╔═╡ 9cb432e9-ce87-4428-b34a-185b2482076a
 begin
 	q1 = meshgrid_uniform(-6.0, 6.0, -6.0, 6.0, 7,7)
-	q2 = 12 * rand(Float64,(2,50)) .- 6
-	q3 = 12 * kronecker_quasirand(2, 50) .- 6
+	q2= rand2d(-6.0, 6.0, -6.0, 6.0, 50)
+	q3 = qrand2d(-6.0, 6.0, -6.0, 6.0, 50)
 end
 
 # ╔═╡ 9bcde98b-b1fa-4db2-a068-378de7a80e10
@@ -838,9 +932,9 @@ test_sample("Quasi-Random",q3,xx_data,y_data)
 # ╔═╡ 100a5022-b6d0-4900-9116-8c9e948645c6
 md"""
 
-#### Observation
+#### Observations
 
-Quasi-Random is the best, followed closely by uniform and then lastly random
+From the plots above we can make some conclusions regarding each of the different sampling methods. In both the standard and least squares setting we can see that the best performing sampling method is the quasi-random. The uniform sampling method allows us to evenly cover the search space but lacks any randomness that would be helpful to the algorithm. The random sampling method on the other hand gives regions of varying densities which causes a large variance in potential results. In some cases there may be many centers randomly placed in good positions and the algorithm will perform well in these cases. However in other instances the random centers may be very poor and lead to terrible results. For those reasons the quasi-random sampling is the best because it balances between space coverage and randomness.
 """
 
 # ╔═╡ ce77c338-8eca-48bb-be4f-ba14a46c7f69
@@ -859,17 +953,40 @@ Complete the `spline_forward_regression` function below, then run the code with 
 
 # ╔═╡ 0513363b-bf3c-4b90-afac-02286cabd175
 function spline_forward_regression(ucrand, xx, y, npoints)
+	#Form spline matrix for forward selection
 	A = [spline_Π(xx) spline_K(xx,ucrand)]
-	idx,_,x,r = forward_selection(A,y,3,npoints)
-	norm(r) / npoints
+	
+	#Sets parameters
+	kstart = 3;
+	#Run forward selection algorithm provided
+	idx,F,Fb,r = forward_selection(A,y,kstart,npoints + kstart)
+	#Compute root mean square error
+	rmsVal = norm(r) / sqrt(length(r))
+	#Cuts off original starting points and shifts indices
+	indices = idx[kstart + 1:end] .- kstart
+	#Pulls out final set of centers
+	u = ucrand[:,indices]
+	#Returns RMSE and new centers
+	rmsVal,u
 	
 end
 
 # ╔═╡ 875c4a94-4252-4ef1-ad7a-5b8c6e48f752
 begin
-	ucrand = 12 * kronecker_quasirand(2, 500) .- 6
-	spline_forward_regression(ucrand, xx_data, y_data, 50)
+	#Forms quasi-random sample of 500 points 
+	ucrand = qrand2d(-6.0, 6.0, -6.0, 6.0, 500)
+	#Runs forward regression to find new centers
+	rmsVal,u = spline_forward_regression(ucrand, xx_data, y_data, 50)
+	rmsVal
 end
+
+# ╔═╡ 383a198e-9d68-4f1f-ae08-5c83550650ef
+md"""
+
+#### Explanation
+
+From the code output above we can see the resulting RMSE when using this forward selection process is 0.09941708867615681. This is lower than any of the RMSE values produced in the previous section by a wide margin. This pronounced drop in RMSE suggests that forward selection is a well-performing method that can be used to improve upon random or quasi-random sampled centers.
+"""
 
 # ╔═╡ 2662eba2-7cb3-4085-87bc-812ed2625046
 md"""
@@ -947,6 +1064,27 @@ md"""
 Use the provided Levenberg-Marquardt solver to refine the center locations picked by the forward selection algorithm.  This is a tricky optimization, and you may need to fiddle with solver parameters to get something you are happy about.  As usual, you should also provide a convergence plot.
 """
 
+# ╔═╡ 16da5970-4c6c-48f5-b24e-9e068dcd2fb2
+begin
+
+	#Store function and Jacobian function
+	r(u) = spline_rproj(u, xx_data, y_data)
+	J(u) = spline_Jproj(u, xx_data, y_data)
+
+	#Stores rnorm values
+ 	lm2 = []
+ 	lm_result = levenberg_marquardt(r, J, u, nsteps=100, monitor=(x, rnorm, μ)->push!(lm2, rnorm))
+	
+
+	c = spline_fit(lm_result, xx_data, y_data)
+	
+	rms_vs_truth(lm_result,c)
+end
+
+
+# ╔═╡ 1edf9e1c-7a86-4ffe-8dc1-1747889da3d8
+plot(lm2, yscale=:log10)
+
 # ╔═╡ 7037f111-bd5c-40a6-bc65-6637cc67c0f8
 md"""
 ## Newton refinement
@@ -1019,6 +1157,22 @@ md"""
 
 Use the provided Newton solver to refine the center locations picked by one of the earlier algorithms (I recommend using the Levenberg-Marquardt output as a starting point).  Give a convergence plot -- do you see quadratic convergence?
 """
+
+# ╔═╡ b8bc3bca-7be1-4d9f-8d3a-252a278da155
+begin 
+	fu(u) = spline_ρproj(u, xx_data, y_data)[1]
+	gu(u) = spline_ρproj(u, xx_data, y_data)[2]
+	hu(u) = spline_ρproj(u, xx_data, y_data)[3]
+
+	rVals = []
+	newton_result = tr_newton(lm_result, fu, gu, hu, nsteps=100, monitor=(x, rnorm, Δ)->push!(rVals, rnorm))
+
+	c2 = spline_fit(newton_result, xx_data, y_data)
+	rms_vs_truth(newton_result, c2)
+end 
+
+# ╔═╡ 81e1dcd5-0395-4691-9868-5d1d4e99e692
+plot(rVals, yscale=:log10)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1955,14 +2109,17 @@ version = "0.9.1+5"
 # ╠═74e18286-34b1-408a-a638-938b876390b2
 # ╟─f5764f3c-c676-4c6e-af10-d622ed8a89ed
 # ╟─530de511-8741-4829-9211-b449f6bcfb21
+# ╟─64eae180-b218-4e58-b8c7-d4214e019a3d
 # ╠═45dc649b-eb08-4191-bba2-d49434832a6e
 # ╠═1364894e-4b6d-411d-b8f5-c4187d502187
-# ╠═47dbfcbb-8569-48a1-8305-db3762bbca29
 # ╠═e705911f-6f03-410d-af19-66027d5f14c2
 # ╠═59ba6ec2-905b-4dcb-9576-c2a311cddba6
+# ╟─d827c0ad-c722-46cc-9652-aeaee8f9f672
+# ╟─c7cf0788-0d3f-4a90-8d86-0474b4d013eb
 # ╠═e0559a2a-a4a5-4a52-96e1-da7c15638680
 # ╠═2a558341-06f6-4720-b525-0d5850b0a1e7
 # ╠═077085a9-6397-4b75-9e31-191376c1712d
+# ╟─fab88160-b284-4f29-8702-76297932b604
 # ╠═9e268afe-6a03-448c-90d5-c0e43e7eb78d
 # ╠═0efc13f8-18f9-42ee-9e28-891e69abb32a
 # ╟─d6f3de3b-c904-4228-a7fa-c60319b1368b
@@ -1971,12 +2128,16 @@ version = "0.9.1+5"
 # ╟─72ea762e-6500-434b-ba77-5792107e9be2
 # ╠═a3faebed-c219-4dcb-896a-0b12e6348e71
 # ╟─3976c748-b2f1-46ed-b757-ba479c5f8481
+# ╠═11cd15f7-90d8-4436-81c2-510de6ad1bbc
 # ╟─7cb92eb0-443b-406b-8c91-e76669f0251e
 # ╠═8a6cb03c-fb1a-4307-9280-255e8fe3e053
+# ╠═ad0fdf80-6061-44c0-ae88-a9b781013468
 # ╠═d2fc5606-5b15-4b62-8fde-ef3a119b634d
 # ╠═3956be53-f8fb-4748-827a-bac27cab2f6f
 # ╠═8a52a7e8-257a-4710-8a73-7ff936211358
+# ╠═5bfad42d-7871-4c71-8a2d-321033538a4d
 # ╠═077864c8-8d66-4892-8f14-b936fd5196d3
+# ╠═c7e0c52f-1419-41cf-91d5-d9889fa2a773
 # ╠═fb6f7d10-8351-4566-ac3b-369076dbe294
 # ╟─14bc2bcb-5195-4820-9212-9fa0956c4b2b
 # ╠═465b74a5-6539-4c62-aed8-24ec7cc9b7e4
@@ -1992,19 +2153,24 @@ version = "0.9.1+5"
 # ╠═c128c068-e41b-41c4-b774-e443cd08ecd7
 # ╠═7aa8015a-54c7-4639-a76f-0b42fba6ff69
 # ╠═26347667-03e4-4914-a2a1-89dd54338765
-# ╠═100a5022-b6d0-4900-9116-8c9e948645c6
+# ╟─100a5022-b6d0-4900-9116-8c9e948645c6
 # ╟─ce77c338-8eca-48bb-be4f-ba14a46c7f69
 # ╟─598435d7-e56c-45d9-ade4-4844b640b530
 # ╠═0513363b-bf3c-4b90-afac-02286cabd175
 # ╠═875c4a94-4252-4ef1-ad7a-5b8c6e48f752
+# ╠═383a198e-9d68-4f1f-ae08-5c83550650ef
 # ╟─2662eba2-7cb3-4085-87bc-812ed2625046
 # ╠═29543f67-8ed6-4012-81c4-5bd78659e8a9
 # ╠═9500819d-cae4-48ba-8a0d-bb27808c17cb
 # ╟─70f68c93-1e57-4bd7-ae5c-000fa7ff2b8a
 # ╟─8cb07531-4d95-4c80-8b58-171487df1951
+# ╠═16da5970-4c6c-48f5-b24e-9e068dcd2fb2
+# ╠═1edf9e1c-7a86-4ffe-8dc1-1747889da3d8
 # ╟─7037f111-bd5c-40a6-bc65-6637cc67c0f8
 # ╠═4c9373f8-f8eb-4ae4-a1af-826839db8389
 # ╠═68a077f0-1280-4f52-87ec-9514df53fb5d
 # ╟─37009b68-6b70-4204-ac33-19818d8fc348
+# ╠═b8bc3bca-7be1-4d9f-8d3a-252a278da155
+# ╠═81e1dcd5-0395-4691-9868-5d1d4e99e692
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
