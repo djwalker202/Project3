@@ -787,11 +787,24 @@ function spline_hess(x,u,c)
 	
 end
 
+# ╔═╡ 6408fccc-3625-4e85-9698-26e4ac6f8803
+function newton(x0,f,hess;monitor=(x, rnorm->nothing))
+	x = copy(x0)
+	for i = 1:10
+		fnew = f(x)
+		H = hess(x)
+
+		x = x - H \ fnew
+		monitor(x,norm(fnew))
+	end
+	x
+end
+
 # ╔═╡ 8a52a7e8-257a-4710-8a73-7ff936211358
 begin
 	#Initial parameters
-	tr2= []
-	tr3 = []
+	newton1 = []
+	newton2 = []
 	x0 = [3.473684210526316, -0.9473684210526315]
 	x1 = [3.0,2.0]
 	
@@ -800,12 +813,11 @@ begin
 	spline_j(x) = spline_hess(x,uqrand,c_qr1)
 	
 	#Overloaded spline evaluation
-	spline_eval2(x) = spline_eval(x,uqrand,c_qr1)
+	#spline_eval2(x) = spline_eval(x,uqrand,c_qr1)
 
-	#Runs trust region newton solver on both initial points
-	x0 = tr_newton(x0,spline_eval2,spline_f,spline_j,monitor=(x, rnorm, μ)->push!(tr2, rnorm))
-	x1 = tr_newton(x1,spline_eval2,spline_f,spline_j,monitor=(x, rnorm, μ)->push!(tr3, rnorm))
-
+	#Runs  newton solver on both initial points
+	x0 = newton(x0,spline_f,spline_j,monitor=(x, rnorm)->push!(newton1, rnorm))
+	x1 = newton(x1,spline_f,spline_j,monitor=(x, rnorm)->push!(newton2, rnorm))
 	x0,x1
 end
 
@@ -816,17 +828,16 @@ md"""
 """
 
 # ╔═╡ 077864c8-8d66-4892-8f14-b936fd5196d3
-plot(tr2, yscale=:log10)
+plot(newton1, yscale=:log10)
 
 # ╔═╡ c7e0c52f-1419-41cf-91d5-d9889fa2a773
 md"""
  The following is the convergence plot of this method when run on the starting point
-(2,2). This starting point resulted in quadratic convergence to the point (3.5537
--1.38958).
+(2,2). This starting point did not converge in 10 iterations and gave a final iterate of  (3.71475 -2.55135).
 """
 
 # ╔═╡ fb6f7d10-8351-4566-ac3b-369076dbe294
-plot(tr3, yscale=:log10)
+plot(newton2, yscale=:log10)
 
 # ╔═╡ 14bc2bcb-5195-4820-9212-9fa0956c4b2b
 md"""
@@ -1066,7 +1077,7 @@ Use the provided Levenberg-Marquardt solver to refine the center locations picke
 
 # ╔═╡ 16da5970-4c6c-48f5-b24e-9e068dcd2fb2
 begin
-
+	sig = 0.1
 	#Store function and Jacobian function
 	r(u) = spline_rproj(u, xx_data, y_data)
 	J(u) = spline_Jproj(u, xx_data, y_data)
@@ -1165,7 +1176,7 @@ begin
 	hu(u) = spline_ρproj(u, xx_data, y_data)[3]
 
 	rVals = []
-	newton_result = tr_newton(lm_result, fu, gu, hu, nsteps=100, monitor=(x, rnorm, Δ)->push!(rVals, rnorm))
+	newton_result = tr_newton(lm_result, fu, gu, hu, nsteps=200, monitor=(x, rnorm, Δ)->push!(rVals, rnorm))
 
 	c2 = spline_fit(newton_result, xx_data, y_data)
 	rms_vs_truth(newton_result, c2)
@@ -2134,10 +2145,11 @@ version = "0.9.1+5"
 # ╠═ad0fdf80-6061-44c0-ae88-a9b781013468
 # ╠═d2fc5606-5b15-4b62-8fde-ef3a119b634d
 # ╠═3956be53-f8fb-4748-827a-bac27cab2f6f
+# ╠═6408fccc-3625-4e85-9698-26e4ac6f8803
 # ╠═8a52a7e8-257a-4710-8a73-7ff936211358
-# ╠═5bfad42d-7871-4c71-8a2d-321033538a4d
-# ╠═077864c8-8d66-4892-8f14-b936fd5196d3
-# ╠═c7e0c52f-1419-41cf-91d5-d9889fa2a773
+# ╟─5bfad42d-7871-4c71-8a2d-321033538a4d
+# ╟─077864c8-8d66-4892-8f14-b936fd5196d3
+# ╟─c7e0c52f-1419-41cf-91d5-d9889fa2a773
 # ╠═fb6f7d10-8351-4566-ac3b-369076dbe294
 # ╟─14bc2bcb-5195-4820-9212-9fa0956c4b2b
 # ╠═465b74a5-6539-4c62-aed8-24ec7cc9b7e4
